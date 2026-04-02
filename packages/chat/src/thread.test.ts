@@ -605,6 +605,31 @@ describe("ThreadImpl", () => {
         editError
       );
     });
+
+    it("should not edit placeholder to empty text before first chunk", async () => {
+      const adapter = createMockAdapter();
+
+      const thread = new ThreadImpl({
+        id: "telegram:123",
+        adapter,
+        channelId: "telegram",
+        stateAdapter: createMockState(),
+        streamingUpdateIntervalMs: 5,
+        fallbackStreamingPlaceholderText: "...",
+      });
+
+      async function* delayedFirstChunk(): AsyncIterable<string> {
+        await new Promise((r) => setTimeout(r, 30));
+        yield "hello";
+      }
+
+      await thread.post(delayedFirstChunk());
+
+      const editedEmpty = vi
+        .mocked(adapter.editMessage)
+        .mock.calls.some(([, , payload]) => payload?.markdown === "");
+      expect(editedEmpty).toBe(false);
+    });
   });
 
   describe("streaming with StreamChunk objects", () => {

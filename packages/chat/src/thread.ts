@@ -620,6 +620,14 @@ export class ThreadImpl<TState = Record<string, unknown>>
       }
 
       const content = renderer.render();
+      if (!content) {
+        // Keep placeholder text visible until real content arrives.
+        if (!stopped) {
+          scheduleNextEdit();
+        }
+        return;
+      }
+
       if (content !== lastEditContent) {
         try {
           await this.adapter.editMessage(threadIdForEdits, msg.id, {
