@@ -1537,6 +1537,48 @@ describe("handleOAuthCallback", () => {
     expect(stored?.botToken).toBe("xoxb-oauth-bot-token");
   });
 
+  it("prefers configured redirectUri over callback query params", async () => {
+    const state = createMockState();
+    const adapter = createSlackAdapter({
+      signingSecret: secret,
+      clientId: "client-id",
+      clientSecret: "client-secret",
+      redirectUri: "https://app.example.com/auth/slack/callback",
+      logger: mockLogger,
+    });
+
+    const mockClient = (adapter as unknown as { client: { oauth: unknown } })
+      .client;
+    const accessMock = vi.fn().mockResolvedValue({
+      ok: true,
+      access_token: "xoxb-oauth-bot-token",
+      bot_user_id: "U_BOT_OAUTH",
+      team: { id: "T_OAUTH_2", name: "OAuth Team 2" },
+    });
+    (
+      mockClient as unknown as {
+        oauth: { v2: { access: ReturnType<typeof vi.fn> } };
+      }
+    ).oauth = {
+      v2: {
+        access: accessMock,
+      },
+    };
+
+    await adapter.initialize(createMockChatInstance(state));
+
+    const request = new Request(
+      "https://example.com/auth/callback/slack?code=oauth-code-456&redirect_uri=https://wrong.example.com/callback"
+    );
+    await adapter.handleOAuthCallback(request);
+
+    expect(accessMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        redirect_uri: "https://app.example.com/auth/slack/callback",
+      })
+    );
+  });
+
   it("throws without clientId and clientSecret", async () => {
     const state = createMockState();
     const adapter = createSlackAdapter({

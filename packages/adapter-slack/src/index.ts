@@ -102,6 +102,12 @@ export interface SlackAdapterConfig {
   /** Slack app client secret (required for OAuth / multi-workspace) */
   clientSecret?: string;
   /**
+   * Fixed OAuth redirect URI to send during code exchange.
+   * Use when Slack does not include redirect_uri in callback query params
+   * (for example when multiple redirect URLs are configured in the app).
+   */
+  redirectUri?: string;
+  /**
    * Base64-encoded 32-byte AES-256-GCM encryption key.
    * If provided, bot tokens stored via setInstallation() will be encrypted at rest.
    */
@@ -387,6 +393,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
   // Multi-workspace support
   private readonly clientId: string | undefined;
   private readonly clientSecret: string | undefined;
+  private readonly redirectUri: string | undefined;
   private readonly encryptionKey: Buffer | undefined;
   private readonly installationKeyPrefix: string;
   private readonly requestContext = new AsyncLocalStorage<{
@@ -440,6 +447,9 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     this.clientSecret =
       config.clientSecret ??
       (zeroConfig ? process.env.SLACK_CLIENT_SECRET : undefined);
+    this.redirectUri =
+      config.redirectUri ??
+      (zeroConfig ? process.env.SLACK_REDIRECT_URI : undefined);
     this.installationKeyPrefix =
       config.installationKeyPrefix ?? "slack:installation";
 
@@ -606,7 +616,8 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
       );
     }
 
-    const redirectUri = url.searchParams.get("redirect_uri") ?? undefined;
+    const redirectUri =
+      this.redirectUri ?? url.searchParams.get("redirect_uri") ?? undefined;
 
     const result = await this.client.oauth.v2.access({
       client_id: this.clientId,
